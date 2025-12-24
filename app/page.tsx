@@ -10,7 +10,6 @@ import { Conversation } from "@/types";
 export default function Home() {
   const {
     conversations,
-    createConversation,
     deleteConversation,
     updateConversation,
     refetch,
@@ -18,6 +17,20 @@ export default function Home() {
 
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Close sidebar on mobile by default
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleConversationUpdate = useCallback(
     (updated: Conversation) => {
@@ -61,19 +74,31 @@ export default function Home() {
     setActiveConversation(null);
   }, []);
 
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
+
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar
         conversations={conversations}
         activeId={activeConversation?.id || null}
         onSelect={handleSelectConversation}
         onDelete={handleDeleteConversation}
         onNewChat={handleNewChat}
+        isOpen={isSidebarOpen}
+        onClose={closeSidebar}
       />
       <ChatContainer
         messages={messages}
         isLoading={isLoading}
         onSend={sendMessage}
+        onToggleSidebar={toggleSidebar}
+        isSidebarOpen={isSidebarOpen}
       />
     </div>
   );
