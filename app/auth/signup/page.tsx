@@ -55,9 +55,8 @@ export default function SignUpPage() {
 
       if (result?.error) {
         setError("自動ログインに失敗しました。ログインページからお試しください。");
-      } else {
-        router.push("/");
-        router.refresh();
+      } else if (result?.ok) {
+        window.location.href = "/";
       }
     } catch {
       setError("登録に失敗しました");
