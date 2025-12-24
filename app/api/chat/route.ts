@@ -1,9 +1,18 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { streamChat } from "@/lib/claude";
+import { auth } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+      });
+    }
+
     const { conversationId, message } = await request.json();
 
     if (!message) {
@@ -15,8 +24,11 @@ export async function POST(request: NextRequest) {
     let conversation;
 
     if (conversationId) {
-      conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
+      conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          userId: session.user.id,
+        },
         include: { messages: { orderBy: { createdAt: "asc" } } },
       });
     }
@@ -26,6 +38,7 @@ export async function POST(request: NextRequest) {
         data: {
           title:
             message.slice(0, 30) + (message.length > 30 ? "..." : ""),
+          userId: session.user.id,
         },
         include: { messages: true },
       });

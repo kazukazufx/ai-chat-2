@@ -1,9 +1,17 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const conversations = await prisma.conversation.findMany({
+      where: { userId: session.user.id },
       orderBy: { updatedAt: "desc" },
       include: {
         messages: {
@@ -21,11 +29,18 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const conversation = await prisma.conversation.create({
       data: {
         title: body.title || "新しい会話",
+        userId: session.user.id,
       },
       include: { messages: true },
     });

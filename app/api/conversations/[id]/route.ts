@@ -1,15 +1,25 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id },
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        userId: session.user.id,
+      },
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
@@ -33,7 +43,25 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
+
+    // Check ownership before deleting
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        userId: session.user.id,
+      },
+    });
+
+    if (!conversation) {
+      return Response.json({ error: "Conversation not found" }, { status: 404 });
+    }
 
     await prisma.conversation.delete({
       where: { id },

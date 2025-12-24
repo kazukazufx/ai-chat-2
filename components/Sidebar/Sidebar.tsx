@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession, signOut } from "next-auth/react";
 import { Conversation } from "@/types";
 import { ConversationList } from "./ConversationList";
 import { ThemeToggle } from "../UI/ThemeToggle";
@@ -24,6 +25,8 @@ export function Sidebar({
   isOpen,
   onClose,
 }: SidebarProps) {
+  const { data: session } = useSession();
+
   const handleSelect = (id: string) => {
     onSelect(id);
     onClose();
@@ -32,6 +35,10 @@ export function Sidebar({
   const handleNewChat = () => {
     onNewChat();
     onClose();
+  };
+
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/auth/signin" });
   };
 
   return (
@@ -93,7 +100,45 @@ export function Sidebar({
           />
         </div>
 
-        <div className="p-3 border-t border-[var(--border-color)]">
+        <div className="p-3 border-t border-[var(--border-color)] space-y-3">
+          {session?.user && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  {session.user.name?.charAt(0).toUpperCase() ||
+                    session.user.email?.charAt(0).toUpperCase() ||
+                    "U"}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {session.user.name || "ユーザー"}
+                  </p>
+                  <p className="text-xs opacity-50 truncate">
+                    {session.user.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-lg hover:bg-[var(--sidebar-hover)] transition-colors flex-shrink-0"
+                title="ログアウト"
+              >
+                <svg
+                  className="w-4 h-4 opacity-70"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-sm opacity-70">AI Chat</span>
             <ThemeToggle />
