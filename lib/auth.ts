@@ -52,6 +52,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    async authorized({ auth, request }) {
+      const isLoggedIn = !!auth?.user;
+      const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
+      const isApiAuthRoute = request.nextUrl.pathname.startsWith("/api/auth");
+
+      if (isApiAuthRoute) {
+        return true;
+      }
+
+      if (isAuthPage) {
+        if (isLoggedIn) {
+          return Response.redirect(new URL("/", request.nextUrl));
+        }
+        return true;
+      }
+
+      return isLoggedIn;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function SignUpPage() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,21 +44,14 @@ export default function SignUpPage() {
         return;
       }
 
-      // Auto login after registration
-      const result = await signIn("credentials", {
+      // Auto login after registration - let NextAuth handle redirect
+      await signIn("credentials", {
         email,
         password,
-        redirect: false,
+        callbackUrl: "/",
       });
-
-      if (result?.error) {
-        setError("自動ログインに失敗しました。ログインページからお試しください。");
-      } else if (result?.ok) {
-        window.location.href = "/";
-      }
     } catch {
       setError("登録に失敗しました");
-    } finally {
       setIsLoading(false);
     }
   };

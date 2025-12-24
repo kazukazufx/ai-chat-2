@@ -2,55 +2,49 @@
 
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const error = searchParams.get("error");
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError("");
 
-    try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
+    // Use redirect: true to let NextAuth handle the redirect
+    await signIn("credentials", {
+      email,
+      password,
+      callbackUrl,
+    });
+  };
 
-      console.log("signIn result:", result);
-
-      if (result?.error) {
-        setError(`認証エラー: ${result.error}`);
-      } else if (result?.ok) {
-        window.location.href = callbackUrl;
-      } else {
-        setError(`予期しない結果: ${JSON.stringify(result)}`);
-      }
-    } catch (err) {
-      console.error("signIn error:", err);
-      setError(`ログインに失敗しました: ${err}`);
-    } finally {
-      setIsLoading(false);
+  const getErrorMessage = (error: string | null) => {
+    if (!error) return null;
+    switch (error) {
+      case "CredentialsSignin":
+        return "メールアドレスまたはパスワードが正しくありません";
+      default:
+        return "ログインに失敗しました";
     }
   };
+
+  const errorMessage = getErrorMessage(error);
 
   return (
     <div className="w-full max-w-md">
       <div className="bg-[var(--bg-secondary)] rounded-xl shadow-lg p-8 border border-[var(--border-color)]">
         <h1 className="text-2xl font-bold text-center mb-6">ログイン</h1>
 
-        {error && (
+        {errorMessage && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
-            {error}
+            {errorMessage}
           </div>
         )}
 
