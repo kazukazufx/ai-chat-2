@@ -26,13 +26,18 @@ function SignInForm() {
         redirect: false,
       });
 
+      console.log("signIn result:", result);
+
       if (result?.error) {
-        setError("メールアドレスまたはパスワードが正しくありません");
+        setError(`認証エラー: ${result.error}`);
       } else if (result?.ok) {
         window.location.href = callbackUrl;
+      } else {
+        setError(`予期しない結果: ${JSON.stringify(result)}`);
       }
-    } catch {
-      setError("ログインに失敗しました");
+    } catch (err) {
+      console.error("signIn error:", err);
+      setError(`ログインに失敗しました: ${err}`);
     } finally {
       setIsLoading(false);
     }
