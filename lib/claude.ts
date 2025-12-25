@@ -4,16 +4,86 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+interface ImageContent {
+  type: "image";
+  source: {
+    type: "base64";
+    media_type: ImageMediaType;
+    data: string;
+  };
+}
+
+interface TextContent {
+  type: "text";
+  text: string;
+}
+
+type ContentBlock = TextContent | ImageContent;
+
+interface MessageParam {
+  role: "user" | "assistant";
+  content: string | ContentBlock[];
+}
+
+interface ImageData {
+  base64: string;
+  type: string;
+}
+
 export async function* streamChat(
-  messages: { role: "user" | "assistant"; content: string }[]
+  messages: { role: "user" | "assistant"; content: string }[],
+  images?: ImageData[]
 ) {
+  // Build the messages array for the API
+  const apiMessages: MessageParam[] = messages.slice(0, -1).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  // Handle the last message with potential images
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage) {
+    if (images && images.length > 0) {
+      const content: ContentBlock[] = [];
+
+      // Add images first
+      for (const img of images) {
+        content.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: img.type as ImageMediaType,
+            data: img.base64,
+          },
+        });
+      }
+
+      // Add text if present
+      if (lastMessage.content) {
+        content.push({
+          type: "text",
+          text: lastMessage.content,
+        });
+      }
+
+      apiMessages.push({
+        role: lastMessage.role,
+        content,
+      });
+    } else {
+      apiMessages.push({
+        role: lastMessage.role,
+        content: lastMessage.content,
+      });
+    }
+  }
+
   const stream = await anthropic.messages.stream({
     model: "claude-sonnet-4-20250514",
     max_tokens: 4096,
-    messages: messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    })),
+    messages: apiMessages,
   });
 
   for await (const event of stream) {

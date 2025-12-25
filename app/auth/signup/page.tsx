@@ -11,6 +11,7 @@ export default function SignUpPage() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isPending, setIsPending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +45,14 @@ export default function SignUpPage() {
         return;
       }
 
-      // Auto login after registration - let NextAuth handle redirect
+      // 承認待ちの場合はメッセージを表示
+      if (data.status === "PENDING") {
+        setIsPending(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // 承認済み（管理者）の場合は自動ログイン
       await signIn("credentials", {
         email,
         password,
@@ -55,6 +63,45 @@ export default function SignUpPage() {
       setIsLoading(false);
     }
   };
+
+  // 承認待ち画面
+  if (isPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-4">
+        <div className="w-full max-w-md">
+          <div className="bg-[var(--bg-secondary)] rounded-xl shadow-lg p-8 border border-[var(--border-color)] text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-500/10 flex items-center justify-center">
+              <svg
+                className="w-8 h-8 text-yellow-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold mb-2">登録申請を受け付けました</h1>
+            <p className="opacity-70 mb-6">
+              管理者が承認するまでお待ちください。
+              <br />
+              承認後、ログインできるようになります。
+            </p>
+            <Link
+              href="/auth/signin"
+              className="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            >
+              ログインページへ
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-4">

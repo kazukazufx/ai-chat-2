@@ -1,7 +1,19 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Message, Conversation } from "@/types";
+import { Message, MessageImage, Conversation } from "@/types";
+
+interface ImageData {
+  base64: string;
+  type: string;
+  name: string;
+}
+
+interface TempImage {
+  id: string;
+  url: string; // data: URL for preview
+  type: string;
+}
 
 export function useChat(
   conversation: Conversation | null,
@@ -17,15 +29,26 @@ export function useChat(
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, images?: ImageData[]) => {
       if (isLoading) return;
 
+      // Create temporary images for preview (using data URLs)
+      const tempImages: MessageImage[] = images?.map((img, index) => ({
+        id: `temp-img-${Date.now()}-${index}`,
+        url: `data:${img.type};base64,${img.base64}`,
+        type: img.type,
+        createdAt: new Date(),
+        messageId: "",
+      })) || [];
+
+      const userMessageId = `temp-${Date.now()}`;
       const userMessage: Message = {
-        id: `temp-${Date.now()}`,
+        id: userMessageId,
         role: "user",
-        content,
+        content: content || "",
         createdAt: new Date(),
         conversationId: conversation?.id || "",
+        images: tempImages.length > 0 ? tempImages : undefined,
       };
 
       setMessages((prev) => [...prev, userMessage]);
@@ -38,6 +61,10 @@ export function useChat(
           body: JSON.stringify({
             conversationId: conversation?.id,
             message: content,
+            images: images?.map((img) => ({
+              base64: img.base64,
+              type: img.type,
+            })),
           }),
         });
 
@@ -53,9 +80,11 @@ export function useChat(
         const decoder = new TextDecoder();
         let assistantContent = "";
         let newConversationId = conversation?.id;
+        let realUserMessageId = userMessageId;
 
+        const assistantMessageId = `temp-assistant-${Date.now()}`;
         const assistantMessage: Message = {
-          id: `temp-assistant-${Date.now()}`,
+          id: assistantMessageId,
           role: "assistant",
           content: "",
           createdAt: new Date(),
@@ -81,11 +110,36 @@ export function useChat(
                 if (parsed.conversationId) {
                   newConversationId = parsed.conversationId;
                 }
+                // Update user message with real ID and blob URLs
+                if (parsed.userMessageId) {
+                  realUserMessageId = parsed.userMessageId;
+                  const uploadedImages: MessageImage[] = parsed.images?.map(
+                    (img: { id: string; url: string; type: string }) => ({
+                      id: img.id,
+                      url: img.url,
+                      type: img.type,
+                      createdAt: new Date(),
+                      messageId: parsed.userMessageId,
+                    })
+                  ) || [];
+
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === userMessageId
+                        ? {
+                            ...m,
+                            id: parsed.userMessageId,
+                            images: uploadedImages.length > 0 ? uploadedImages : m.images,
+                          }
+                        : m
+                    )
+                  );
+                }
                 if (parsed.content) {
                   assistantContent += parsed.content;
                   setMessages((prev) =>
                     prev.map((m) =>
-                      m.id === assistantMessage.id
+                      m.id === assistantMessageId
                         ? { ...m, content: assistantContent }
                         : m
                     )
@@ -101,7 +155,7 @@ export function useChat(
         if (newConversationId && newConversationId !== conversation?.id) {
           const updatedConversation: Conversation = {
             id: newConversationId,
-            title: content.slice(0, 30) + (content.length > 30 ? "..." : ""),
+            title: (content || "画像").slice(0, 30) + ((content || "").length > 30 ? "..." : ""),
             createdAt: new Date(),
             updatedAt: new Date(),
             messages: [

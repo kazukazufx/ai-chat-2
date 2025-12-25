@@ -30,7 +30,18 @@ function SignInForm() {
     switch (error) {
       case "CredentialsSignin":
         return "メールアドレスまたはパスワードが正しくありません";
+      case "pending":
+        return "アカウントは承認待ちです。管理者の承認をお待ちください。";
+      case "rejected":
+        return "アカウントは承認されませんでした。管理者にお問い合わせください。";
       default:
+        // エラーメッセージに "pending" または "rejected" が含まれる場合
+        if (error.includes("pending")) {
+          return "アカウントは承認待ちです。管理者の承認をお待ちください。";
+        }
+        if (error.includes("rejected")) {
+          return "アカウントは承認されませんでした。管理者にお問い合わせください。";
+        }
         return "ログインに失敗しました";
     }
   };

@@ -11,6 +11,7 @@ export async function GET() {
         id: true,
         name: true,
         email: true,
+        status: true,
         createdAt: true,
         _count: {
           select: {
@@ -18,7 +19,10 @@ export async function GET() {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { status: "asc" }, // PENDINGを上に
+        { createdAt: "desc" },
+      ],
     });
 
     return Response.json(users);

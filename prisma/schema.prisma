@@ -10,14 +10,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
-  id             String    @id @default(uuid())
+  id             String     @id @default(uuid())
   name           String?
-  email          String    @unique
+  email          String     @unique
   hashedPassword String
   image          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  status         UserStatus @default(PENDING)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
   accounts       Account[]
   sessions       Session[]
   conversations  Conversation[]
@@ -69,10 +76,20 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(uuid())
-  role           String       // "user" | "assistant"
+  id             String         @id @default(uuid())
+  role           String         // "user" | "assistant"
   content        String
-  createdAt      DateTime     @default(now())
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
+  images         MessageImage[]
+}
+
+model MessageImage {
+  id        String   @id @default(uuid())
+  url       String   // Vercel Blob URL
+  type      String   // image/jpeg, image/png, etc.
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
 }

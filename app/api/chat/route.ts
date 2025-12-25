@@ -2,6 +2,17 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { streamChat } from "@/lib/claude";
 import { auth } from "@/lib/auth";
+import { put } from "@vercel/blob";
+
+interface ImageData {
+  base64: string;
+  type: string;
+}
+
+interface UploadedImage {
+  url: string;
+  type: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +24,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { conversationId, message } = await request.json();
+    const { conversationId, message, images } = await request.json();
 
-    if (!message) {
-      return new Response(JSON.stringify({ error: "Message is required" }), {
+    if (!message && (!images || images.length === 0)) {
+      return new Response(JSON.stringify({ error: "Message or images required" }), {
         status: 400,
       });
     }
@@ -29,27 +40,64 @@ export async function POST(request: NextRequest) {
           id: conversationId,
           userId: session.user.id,
         },
-        include: { messages: { orderBy: { createdAt: "asc" } } },
+        include: {
+          messages: {
+            orderBy: { createdAt: "asc" },
+            include: { images: true },
+          },
+        },
       });
     }
 
     if (!conversation) {
+      const title = message
+        ? message.slice(0, 30) + (message.length > 30 ? "..." : "")
+        : "画像を送信";
       conversation = await prisma.conversation.create({
         data: {
-          title:
-            message.slice(0, 30) + (message.length > 30 ? "..." : ""),
+          title,
           userId: session.user.id,
         },
         include: { messages: true },
       });
     }
 
-    await prisma.message.create({
+    // Upload images to Vercel Blob
+    const uploadedImages: UploadedImage[] = [];
+    if (images && images.length > 0) {
+      for (const img of images as ImageData[]) {
+        const buffer = Buffer.from(img.base64, "base64");
+        const extension = img.type.split("/")[1] || "png";
+        const filename = `chat-images/${conversation.id}/${Date.now()}.${extension}`;
+
+        const blob = await put(filename, buffer, {
+          access: "public",
+          contentType: img.type,
+        });
+
+        uploadedImages.push({
+          url: blob.url,
+          type: img.type,
+        });
+      }
+    }
+
+    // Store message content
+    const storedContent = message || (uploadedImages.length > 0 ? "" : "");
+
+    const userMessage = await prisma.message.create({
       data: {
         role: "user",
-        content: message,
+        content: storedContent,
         conversationId: conversation.id,
+        images: uploadedImages.length > 0 ? {
+          create: uploadedImages.map((img) => ({
+            url: img.url,
+            type: img.type,
+          })),
+        } : undefined,
       },
+      include: { images: true },
     });
 
     const allMessages = [
@@ -57,7 +105,7 @@ export async function POST(request: NextRequest) {
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
-      { role: "user" as const, content: message },
+      { role: "user" as const, content: message || "" },
     ];
 
     const encoder = new TextEncoder();
@@ -66,13 +114,22 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Send conversation ID and uploaded image URLs
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ conversationId: conversation.id })}\n\n`
+              `data: ${JSON.stringify({
+                conversationId: conversation.id,
+                userMessageId: userMessage.id,
+                images: userMessage.images?.map((img) => ({
+                  id: img.id,
+                  url: img.url,
+                  type: img.type,
+                })),
+              })}\n\n`
             )
           );
 
-          for await (const chunk of streamChat(allMessages)) {
+          for await (const chunk of streamChat(allMessages, images)) {
             fullResponse += chunk;
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`)

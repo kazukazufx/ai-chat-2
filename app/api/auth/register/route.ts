@@ -1,6 +1,12 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { UserStatus } from "@prisma/client";
+
+function isAdminEmail(email: string): boolean {
+  const adminEmails = process.env.ADMIN_EMAIL?.split(",").map((e) => e.trim().toLowerCase()) || [];
+  return adminEmails.includes(email.toLowerCase());
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,11 +40,15 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // 管理者メールアドレスは即時承認、その他は承認待ち
+    const status: UserStatus = isAdminEmail(email) ? "APPROVED" : "PENDING";
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
         hashedPassword,
+        status,
       },
     });
 
@@ -46,6 +56,7 @@ export async function POST(request: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
+      status: user.status,
     });
   } catch (error) {
     console.error("Registration error:", error);

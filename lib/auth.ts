@@ -42,6 +42,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        // 承認済みユーザーのみログイン可能
+        if (user.status === "PENDING") {
+          throw new Error("pending");
+        }
+        if (user.status === "REJECTED") {
+          throw new Error("rejected");
+        }
+
         return {
           id: user.id,
           email: user.email,
