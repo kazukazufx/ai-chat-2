@@ -66,12 +66,19 @@ export function useConversations() {
     );
   }, []);
 
+  const updateConversationTitle = useCallback((id: string, title: string) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title } : c))
+    );
+  }, []);
+
   return {
     conversations,
     isLoading,
     createConversation,
     deleteConversation,
     updateConversation,
+    updateConversationTitle,
     refetch: fetchConversations,
   };
 }

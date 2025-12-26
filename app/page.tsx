@@ -12,6 +12,7 @@ export default function Home() {
     conversations,
     deleteConversation,
     updateConversation,
+    updateConversationTitle,
     refetch,
   } = useConversations();
 
@@ -41,9 +42,20 @@ export default function Home() {
     [updateConversation, refetch]
   );
 
+  const handleTitleUpdate = useCallback(
+    (conversationId: string, title: string) => {
+      updateConversationTitle(conversationId, title);
+      if (activeConversation?.id === conversationId) {
+        setActiveConversation((prev) => (prev ? { ...prev, title } : null));
+      }
+    },
+    [updateConversationTitle, activeConversation?.id]
+  );
+
   const { messages, isLoading, sendMessage, setConversation } = useChat(
     activeConversation,
-    handleConversationUpdate
+    handleConversationUpdate,
+    handleTitleUpdate
   );
 
   useEffect(() => {

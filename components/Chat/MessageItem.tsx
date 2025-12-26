@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Message } from "@/types";
 
 interface MessageItemProps {
@@ -40,12 +41,15 @@ export function MessageItem({ message }: MessageItemProps) {
                     <button
                       key={img.id}
                       onClick={() => setExpandedImage(img.url)}
-                      className="relative group"
+                      className="relative group w-32 h-32 sm:w-48 sm:h-48"
                     >
-                      <img
+                      <Image
                         src={img.url}
                         alt="添付画像"
-                        className="max-w-48 max-h-48 object-cover rounded-lg border border-[var(--border-color)] hover:opacity-90 transition-opacity cursor-pointer"
+                        fill
+                        sizes="(max-width: 640px) 128px, 192px"
+                        className="object-cover rounded-lg border border-[var(--border-color)] hover:opacity-90 transition-opacity cursor-pointer"
+                        unoptimized
                       />
                     </button>
                   ))}
@@ -65,15 +69,21 @@ export function MessageItem({ message }: MessageItemProps) {
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
           onClick={() => setExpandedImage(null)}
         >
-          <div className="relative max-w-full max-h-full">
-            <img
+          <div className="relative w-full h-full max-w-4xl max-h-[90vh]">
+            <Image
               src={expandedImage}
               alt="拡大画像"
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              fill
+              sizes="100vw"
+              className="object-contain rounded-lg"
+              unoptimized
             />
             <button
-              onClick={() => setExpandedImage(null)}
-              className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedImage(null);
+              }}
+              className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors z-10"
             >
               ×
             </button>

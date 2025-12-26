@@ -39,6 +39,48 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const { title } = await request.json();
+
+    if (!title || typeof title !== "string") {
+      return Response.json({ error: "Title is required" }, { status: 400 });
+    }
+
+    // Check ownership before updating
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        userId: session.user.id,
+      },
+    });
+
+    if (!conversation) {
+      return Response.json({ error: "Conversation not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.conversation.update({
+      where: { id },
+      data: { title },
+    });
+
+    return Response.json(updated);
+  } catch (error) {
+    console.error("Update conversation error:", error);
+    return Response.json({ error: "Failed to update conversation" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

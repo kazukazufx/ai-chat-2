@@ -32,6 +32,36 @@ interface ImageData {
   type: string;
 }
 
+export async function generateTitle(
+  userMessage: string,
+  assistantMessage: string
+): Promise<string> {
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 50,
+      messages: [
+        {
+          role: "user",
+          content: `以下の会話の内容を表す簡潔なタイトルを日本語で生成してください。タイトルのみを出力し、説明は不要です。15文字以内にしてください。
+
+ユーザー: ${userMessage.slice(0, 200)}
+アシスタント: ${assistantMessage.slice(0, 200)}`,
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    if (textBlock && textBlock.type === "text") {
+      return textBlock.text.trim().slice(0, 30);
+    }
+    return userMessage.slice(0, 30);
+  } catch (error) {
+    console.error("Failed to generate title:", error);
+    return userMessage.slice(0, 30) + (userMessage.length > 30 ? "..." : "");
+  }
+}
+
 export async function* streamChat(
   messages: { role: "user" | "assistant"; content: string }[],
   images?: ImageData[]

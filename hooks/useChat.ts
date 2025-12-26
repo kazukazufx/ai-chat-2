@@ -17,7 +17,8 @@ interface TempImage {
 
 export function useChat(
   conversation: Conversation | null,
-  onConversationUpdate: (conversation: Conversation) => void
+  onConversationUpdate: (conversation: Conversation) => void,
+  onTitleUpdate?: (conversationId: string, title: string) => void
 ) {
   const [messages, setMessages] = useState<Message[]>(
     conversation?.messages || []
@@ -145,6 +146,9 @@ export function useChat(
                     )
                   );
                 }
+                if (parsed.title && newConversationId && onTitleUpdate) {
+                  onTitleUpdate(newConversationId, parsed.title);
+                }
               } catch {
                 // Skip invalid JSON
               }
@@ -182,7 +186,7 @@ export function useChat(
         setIsLoading(false);
       }
     },
-    [conversation, isLoading, messages, onConversationUpdate]
+    [conversation, isLoading, messages, onConversationUpdate, onTitleUpdate]
   );
 
   return {

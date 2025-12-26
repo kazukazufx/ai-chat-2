@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { streamChat } from "@/lib/claude";
+import { streamChat, generateTitle } from "@/lib/claude";
 import { auth } from "@/lib/auth";
 import { put } from "@vercel/blob";
 
@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const isNewConversation = !conversation;
     if (!conversation) {
       const title = message
         ? message.slice(0, 30) + (message.length > 30 ? "..." : "")
@@ -143,6 +144,18 @@ export async function POST(request: NextRequest) {
               conversationId: conversation.id,
             },
           });
+
+          // Generate title for new conversations
+          if (isNewConversation && message) {
+            const generatedTitle = await generateTitle(message, fullResponse);
+            await prisma.conversation.update({
+              where: { id: conversation.id },
+              data: { title: generatedTitle },
+            });
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ title: generatedTitle })}\n\n`)
+            );
+          }
 
           controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
           controller.close();
