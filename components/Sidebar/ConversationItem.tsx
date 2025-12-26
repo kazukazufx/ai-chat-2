@@ -18,15 +18,15 @@ export function ConversationItem({
 }: ConversationItemProps) {
   return (
     <div
-      className={`group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+      className={`group flex items-start gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
         isActive
           ? "bg-[var(--sidebar-hover)]"
           : "hover:bg-[var(--sidebar-hover)]"
       }`}
       onClick={() => onSelect(conversation.id)}
     >
-      <ChatIcon className="w-4 h-4 flex-shrink-0 opacity-70" />
-      <span className="flex-1 truncate text-sm">{conversation.title}</span>
+      <ChatIcon className="w-4 h-4 flex-shrink-0 opacity-70 mt-0.5" />
+      <span className="flex-1 text-sm break-words">{conversation.title}</span>
       <button
         onClick={(e) => {
           e.stopPropagation();
