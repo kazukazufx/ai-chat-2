@@ -6,6 +6,15 @@ export interface MessageImage {
   messageId: string;
 }
 
+export interface MessageFile {
+  id: string;
+  name: string;
+  type: string;
+  textContent: string;
+  createdAt: Date;
+  messageId: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -13,6 +22,7 @@ export interface Message {
   createdAt: Date;
   conversationId: string;
   images?: MessageImage[];
+  files?: MessageFile[];
 }
 
 export interface Conversation {

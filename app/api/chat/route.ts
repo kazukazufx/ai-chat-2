@@ -9,9 +9,21 @@ interface ImageData {
   type: string;
 }
 
+interface FileData {
+  base64: string;
+  type: string;
+  name: string;
+}
+
 interface UploadedImage {
   url: string;
   type: string;
+}
+
+interface ProcessedFile {
+  name: string;
+  type: string;
+  textContent: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -24,12 +36,44 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { conversationId, message, images } = await request.json();
+    const { conversationId, message, images, files } = await request.json();
 
-    if (!message && (!images || images.length === 0)) {
-      return new Response(JSON.stringify({ error: "Message or images required" }), {
+    if (!message && (!images || images.length === 0) && (!files || files.length === 0)) {
+      return new Response(JSON.stringify({ error: "Message, images, or files required" }), {
         status: 400,
       });
+    }
+
+    // Process files and extract text content
+    const processedFiles: ProcessedFile[] = [];
+    if (files && files.length > 0) {
+      for (const file of files as FileData[]) {
+        const buffer = Buffer.from(file.base64, "base64");
+        let textContent = "";
+
+        if (file.type === "application/pdf") {
+          try {
+            // Dynamic import for pdf-parse to work with Turbopack
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const pdfParseModule = await import("pdf-parse") as any;
+            const pdfParse = pdfParseModule.default || pdfParseModule;
+            const pdfData = await pdfParse(buffer);
+            textContent = pdfData.text;
+          } catch (error) {
+            console.error("PDF parsing error:", error);
+            textContent = "[PDFの読み取りに失敗しました]";
+          }
+        } else {
+          // For text-based files, decode directly
+          textContent = buffer.toString("utf-8");
+        }
+
+        processedFiles.push({
+          name: file.name,
+          type: file.type,
+          textContent,
+        });
+      }
     }
 
     let conversation;
@@ -43,7 +87,7 @@ export async function POST(request: NextRequest) {
         include: {
           messages: {
             orderBy: { createdAt: "asc" },
-            include: { images: true },
+            include: { images: true, files: true },
           },
         },
       });
@@ -53,6 +97,8 @@ export async function POST(request: NextRequest) {
     if (!conversation) {
       const title = message
         ? message.slice(0, 30) + (message.length > 30 ? "..." : "")
+        : processedFiles.length > 0
+        ? processedFiles[0].name
         : "画像を送信";
       conversation = await prisma.conversation.create({
         data: {
@@ -84,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store message content
-    const storedContent = message || (uploadedImages.length > 0 ? "" : "");
+    const storedContent = message || (uploadedImages.length > 0 || processedFiles.length > 0 ? "" : "");
 
     const userMessage = await prisma.message.create({
       data: {
@@ -97,16 +143,32 @@ export async function POST(request: NextRequest) {
             type: img.type,
           })),
         } : undefined,
+        files: processedFiles.length > 0 ? {
+          create: processedFiles.map((file) => ({
+            name: file.name,
+            type: file.type,
+            textContent: file.textContent,
+          })),
+        } : undefined,
       },
-      include: { images: true },
+      include: { images: true, files: true },
     });
+
+    // Build message content with file contents for Claude
+    let messageForClaude = message || "";
+    if (processedFiles.length > 0) {
+      const fileContents = processedFiles.map((file) =>
+        `\n\n--- ファイル: ${file.name} ---\n${file.textContent}\n--- ファイル終了 ---`
+      ).join("");
+      messageForClaude = messageForClaude + fileContents;
+    }
 
     const allMessages = [
       ...conversation.messages.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
-      { role: "user" as const, content: message || "" },
+      { role: "user" as const, content: messageForClaude },
     ];
 
     const encoder = new TextEncoder();
@@ -115,7 +177,7 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send conversation ID and uploaded image URLs
+          // Send conversation ID, uploaded image URLs, and file info
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -125,6 +187,11 @@ export async function POST(request: NextRequest) {
                   id: img.id,
                   url: img.url,
                   type: img.type,
+                })),
+                files: userMessage.files?.map((file) => ({
+                  id: file.id,
+                  name: file.name,
+                  type: file.type,
                 })),
               })}\n\n`
             )

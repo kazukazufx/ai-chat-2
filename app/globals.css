@@ -11,6 +11,7 @@
   --input-bg: #ffffff;
   --input-border: #d1d5db;
   --border-color: #e5e7eb;
+  --code-bg: #f3f4f6;
 }
 
 .dark {
@@ -24,6 +25,7 @@
   --input-bg: #2f2f2f;
   --input-border: #424242;
   --border-color: #424242;
+  --code-bg: #3a3a3a;
 }
 
 @theme inline {

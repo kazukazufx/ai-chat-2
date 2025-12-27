@@ -9,23 +9,48 @@ interface ImageData {
   name: string;
 }
 
+interface FileData {
+  base64: string;
+  type: string;
+  name: string;
+}
+
 interface ChatInputProps {
-  onSend: (message: string, images?: ImageData[]) => void;
+  onSend: (message: string, images?: ImageData[], files?: FileData[]) => void;
   disabled?: boolean;
 }
+
+const SUPPORTED_FILE_TYPES = [
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "application/json",
+  "text/html",
+  "text/css",
+  "text/javascript",
+  "application/javascript",
+];
 
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [images, setImages] = useState<ImageData[]>([]);
+  const [files, setFiles] = useState<FileData[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = () => {
     const trimmed = input.trim();
-    if ((trimmed || images.length > 0) && !disabled) {
-      onSend(trimmed, images.length > 0 ? images : undefined);
+    if ((trimmed || images.length > 0 || files.length > 0) && !disabled) {
+      onSend(
+        trimmed,
+        images.length > 0 ? images : undefined,
+        files.length > 0 ? files : undefined
+      );
       setInput("");
       setImages([]);
+      setFiles([]);
     }
   };
 
@@ -36,14 +61,14 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     }
   };
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const inputFiles = e.target.files;
+    if (!inputFiles) return;
 
     const newImages: ImageData[] = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let i = 0; i < inputFiles.length; i++) {
+      const file = inputFiles[i];
       if (!file.type.startsWith("image/")) continue;
 
       const base64 = await fileToBase64(file);
@@ -55,6 +80,30 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     }
 
     setImages((prev) => [...prev, ...newImages]);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
+
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const inputFiles = e.target.files;
+    if (!inputFiles) return;
+
+    const newFiles: FileData[] = [];
+
+    for (let i = 0; i < inputFiles.length; i++) {
+      const file = inputFiles[i];
+      if (!SUPPORTED_FILE_TYPES.includes(file.type)) continue;
+
+      const base64 = await fileToBase64(file);
+      newFiles.push({
+        base64,
+        type: file.type,
+        name: file.name,
+      });
+    }
+
+    setFiles((prev) => [...prev, ...newFiles]);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -66,7 +115,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       reader.readAsDataURL(file);
       reader.onload = () => {
         const result = reader.result as string;
-        // Remove data:image/xxx;base64, prefix
+        // Remove data:xxx;base64, prefix
         const base64 = result.split(",")[1];
         resolve(base64);
       };
@@ -76,6 +125,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -99,26 +152,53 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
 
     if (disabled) return;
 
-    const files = e.dataTransfer.files;
-    if (!files || files.length === 0) return;
+    const droppedFiles = e.dataTransfer.files;
+    if (!droppedFiles || droppedFiles.length === 0) return;
 
     const newImages: ImageData[] = [];
+    const newFiles: FileData[] = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (!file.type.startsWith("image/")) continue;
+    for (let i = 0; i < droppedFiles.length; i++) {
+      const file = droppedFiles[i];
 
-      const base64 = await fileToBase64(file);
-      newImages.push({
-        base64,
-        type: file.type,
-        name: file.name,
-      });
+      if (file.type.startsWith("image/")) {
+        const base64 = await fileToBase64(file);
+        newImages.push({
+          base64,
+          type: file.type,
+          name: file.name,
+        });
+      } else if (SUPPORTED_FILE_TYPES.includes(file.type)) {
+        const base64 = await fileToBase64(file);
+        newFiles.push({
+          base64,
+          type: file.type,
+          name: file.name,
+        });
+      }
     }
 
     if (newImages.length > 0) {
       setImages((prev) => [...prev, ...newImages]);
     }
+    if (newFiles.length > 0) {
+      setFiles((prev) => [...prev, ...newFiles]);
+    }
+  };
+
+  const getFileIcon = (type: string) => {
+    if (type === "application/pdf") {
+      return (
+        <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h2v5h-2v-5zm-2 2h1v3H8v-3zm6 0h1v3h-1v-3z" />
+        </svg>
+      );
+    }
+    return (
+      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
   };
 
   return (
@@ -145,6 +225,27 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           </div>
         )}
 
+        {/* File Preview */}
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {files.map((file, index) => (
+              <div
+                key={index}
+                className="relative group flex items-center gap-2 px-3 py-2 bg-[var(--sidebar-bg)] rounded-lg border border-[var(--border-color)]"
+              >
+                {getFileIcon(file.type)}
+                <span className="text-sm max-w-32 truncate">{file.name}</span>
+                <button
+                  onClick={() => removeFile(index)}
+                  className="w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div
           className={`relative flex items-end gap-2 bg-[var(--input-bg)] border rounded-xl p-3 transition-colors ${
             isDragging
@@ -157,7 +258,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         >
           {/* Image Upload Button */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => imageInputRef.current?.click()}
             disabled={disabled}
             className="p-2 rounded-lg hover:bg-[var(--sidebar-hover)] transition-colors disabled:opacity-50"
             title="画像を追加"
@@ -177,9 +278,39 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
             </svg>
           </button>
           <input
-            ref={fileInputRef}
+            ref={imageInputRef}
             type="file"
             accept="image/*"
+            multiple
+            onChange={handleImageChange}
+            className="hidden"
+          />
+
+          {/* File Upload Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled}
+            className="p-2 rounded-lg hover:bg-[var(--sidebar-hover)] transition-colors disabled:opacity-50"
+            title="ファイルを追加 (PDF, TXT, etc.)"
+          >
+            <svg
+              className="w-5 h-5 opacity-70"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+              />
+            </svg>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt,.md,.csv,.json,.html,.css,.js"
             multiple
             onChange={handleFileChange}
             className="hidden"
@@ -197,14 +328,14 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           />
           <button
             onClick={handleSubmit}
-            disabled={(!input.trim() && images.length === 0) || disabled}
+            disabled={(!input.trim() && images.length === 0 && files.length === 0) || disabled}
             className="p-2 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
           >
             <SendIcon className="w-4 h-4" />
           </button>
         </div>
         <p className="text-xs text-center mt-2 opacity-50">
-          Shift + Enter で改行 ・ 画像をドラッグ&ドロップまたはクリックで追加
+          Shift + Enter で改行 ・ ファイルをドラッグ&ドロップまたはクリックで追加
         </p>
       </div>
     </div>

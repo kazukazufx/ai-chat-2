@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Message, MessageImage, Conversation } from "@/types";
+import { Message, MessageImage, MessageFile, Conversation } from "@/types";
 
 interface ImageData {
   base64: string;
@@ -9,10 +9,10 @@ interface ImageData {
   name: string;
 }
 
-interface TempImage {
-  id: string;
-  url: string; // data: URL for preview
+interface FileData {
+  base64: string;
   type: string;
+  name: string;
 }
 
 export function useChat(
@@ -30,7 +30,7 @@ export function useChat(
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string, images?: ImageData[]) => {
+    async (content: string, images?: ImageData[], files?: FileData[]) => {
       if (isLoading) return;
 
       // Create temporary images for preview (using data URLs)
@@ -38,6 +38,16 @@ export function useChat(
         id: `temp-img-${Date.now()}-${index}`,
         url: `data:${img.type};base64,${img.base64}`,
         type: img.type,
+        createdAt: new Date(),
+        messageId: "",
+      })) || [];
+
+      // Create temporary files for preview
+      const tempFiles: MessageFile[] = files?.map((file, index) => ({
+        id: `temp-file-${Date.now()}-${index}`,
+        name: file.name,
+        type: file.type,
+        textContent: "",
         createdAt: new Date(),
         messageId: "",
       })) || [];
@@ -50,6 +60,7 @@ export function useChat(
         createdAt: new Date(),
         conversationId: conversation?.id || "",
         images: tempImages.length > 0 ? tempImages : undefined,
+        files: tempFiles.length > 0 ? tempFiles : undefined,
       };
 
       setMessages((prev) => [...prev, userMessage]);
@@ -65,6 +76,11 @@ export function useChat(
             images: images?.map((img) => ({
               base64: img.base64,
               type: img.type,
+            })),
+            files: files?.map((file) => ({
+              base64: file.base64,
+              type: file.type,
+              name: file.name,
             })),
           }),
         });
@@ -111,7 +127,7 @@ export function useChat(
                 if (parsed.conversationId) {
                   newConversationId = parsed.conversationId;
                 }
-                // Update user message with real ID and blob URLs
+                // Update user message with real ID, blob URLs, and file info
                 if (parsed.userMessageId) {
                   realUserMessageId = parsed.userMessageId;
                   const uploadedImages: MessageImage[] = parsed.images?.map(
@@ -124,6 +140,17 @@ export function useChat(
                     })
                   ) || [];
 
+                  const uploadedFiles: MessageFile[] = parsed.files?.map(
+                    (file: { id: string; name: string; type: string }) => ({
+                      id: file.id,
+                      name: file.name,
+                      type: file.type,
+                      textContent: "",
+                      createdAt: new Date(),
+                      messageId: parsed.userMessageId,
+                    })
+                  ) || [];
+
                   setMessages((prev) =>
                     prev.map((m) =>
                       m.id === userMessageId
@@ -131,6 +158,7 @@ export function useChat(
                             ...m,
                             id: parsed.userMessageId,
                             images: uploadedImages.length > 0 ? uploadedImages : m.images,
+                            files: uploadedFiles.length > 0 ? uploadedFiles : m.files,
                           }
                         : m
                     )

@@ -23,7 +23,7 @@ export async function GET(
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
-          include: { images: true },
+          include: { images: true, files: true },
         },
       },
     });
